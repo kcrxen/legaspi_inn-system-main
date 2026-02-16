@@ -867,8 +867,6 @@
 }
 
 body {
-  display: flex;
-  min-height: 100vh;
   background: #f5e9dc;
   color: #3b2c48;
 }
@@ -1824,4 +1822,36 @@ table button {
   .modal-right{
     padding: 24px;
   }
+}
+
+/* ===== React Layout Fix ===== */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  display: block;          /* IMPORTANT: remove flex from body */
+  background: #f5e9dc;
+  color: #3b2c48;
+}
+
+/* Your React wrapper should handle the flex layout */
+.container {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.content {
+  flex: 1;
+  padding: 20px;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 15px;
+  margin: 0;              /* prevents weird offset */
+  padding: 0;
 }

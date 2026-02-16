@@ -47,7 +47,7 @@ function App() {
   }, []);
 
   return (
-    <div>
+    <div className="container">
       <aside className="sidebar">
         <div className="logo">
           <img src="/assets/images/logo.png" alt="Legaspi Inn Logo" />
@@ -298,9 +298,6 @@ function App() {
           </div>
         </section>
       </main>
-
-      {/* NOTE: Modals + calculator JS (calculator.js/user.js) won’t work like plain HTML in React.
-          We should convert them to React components next. */}
     </div>
   );
 }
