@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import SalesModal from "../components/SalesModal";
 
 const STORAGE_KEY = "transactions";
 const SALES_KEY = "purchased_by_trans";
@@ -56,7 +57,6 @@ export default function Transactions() {
 
   // ----- New Transaction modal -----
   const [txOpen, setTxOpen] = useState(false);
-
   const [txForm, setTxForm] = useState({
     trans_id: "",
     guest_name: "",
@@ -68,26 +68,32 @@ export default function Transactions() {
     date_created: "",
   });
 
-  // ----- Sales modal -----
+  // ----- Sales modal (React component) -----
   const [salesOpen, setSalesOpen] = useState(false);
-  const [salesForm, setSalesForm] = useState({
-    trans_id: "",
+  const [salesTarget, setSalesTarget] = useState({
+    transId: "",
     guest: "",
-    item: "",
-    cost: "",
-    qty: 1,
-    subtotal: "0.00",
   });
+
+  // Items shown in SalesModal dropdown
+  const salesItems = useMemo(
+    () => [
+      { name: "Nature’s Spring", cost: 20 },
+      { name: "Safeguard", cost: 15 },
+      { name: "Towel", cost: 50 },
+    ],
+    []
+  );
 
   // Load from localStorage on mount
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     if (Array.isArray(saved) && saved.length) {
-      // Merge initialRows + saved, avoid duplicates by trans_id
       const map = new Map();
       [...initialRows, ...saved].forEach((t) => map.set(t.trans_id, t));
       setTransactions(Array.from(map.values()));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Generate next ID based on existing + saved
@@ -100,7 +106,7 @@ export default function Transactions() {
     return `T${pad(max + 1)}`;
   }, [transactions]);
 
-  // When opening New Tx modal, prefill ID
+  // When opening New Tx modal, prefill ID + date
   useEffect(() => {
     if (txOpen) {
       setTxForm((prev) => ({
@@ -111,7 +117,7 @@ export default function Transactions() {
     }
   }, [txOpen, nextId]);
 
-  // Search filter (Guest Name like your placeholder)
+  // Search filter
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return transactions;
@@ -120,7 +126,6 @@ export default function Transactions() {
     );
   }, [search, transactions]);
 
-  // Helpers
   function openTxModal() {
     setTxOpen(true);
   }
@@ -129,11 +134,10 @@ export default function Transactions() {
   }
 
   function saveTransactionsToStorage(list) {
-    // Only save transactions that are not part of initialRows? (optional)
-    // For now: save everything EXCEPT the initial sample rows is also ok.
-    const onlyUserAdded = list.filter(
-      (t) => getIdNumber(t.trans_id) !== null && getIdNumber(t.trans_id) > 3
-    );
+    const onlyUserAdded = list.filter((t) => {
+      const n = getIdNumber(t.trans_id);
+      return n !== null && n > 3;
+    });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(onlyUserAdded));
   }
 
@@ -163,7 +167,6 @@ export default function Transactions() {
     };
 
     setTransactions((prev) => {
-      // avoid duplicates by trans_id
       const map = new Map(prev.map((t) => [t.trans_id, t]));
       map.set(newTx.trans_id, newTx);
       const updated = Array.from(map.values());
@@ -171,7 +174,6 @@ export default function Transactions() {
       return updated;
     });
 
-    // reset form
     setTxForm({
       trans_id: "",
       guest_name: "",
@@ -185,22 +187,9 @@ export default function Transactions() {
     closeTxModal();
   }
 
-  // SALES modal logic
-  function computeSubtotal(cost, qty) {
-    const c = Number(cost || 0);
-    const q = Number(qty || 0);
-    return (c * q).toFixed(2);
-  }
-
-  function openSalesModal(trans_id, guest_name) {
-    setSalesForm({
-      trans_id,
-      guest: guest_name || "",
-      item: "",
-      cost: "",
-      qty: 1,
-      subtotal: "0.00",
-    });
+  // ✅ OPEN SalesModal with row info
+  function openSalesModal(transId, guestName) {
+    setSalesTarget({ transId, guest: guestName || "" });
     setSalesOpen(true);
   }
 
@@ -208,55 +197,19 @@ export default function Transactions() {
     setSalesOpen(false);
   }
 
-  function handleSalesChange(next) {
-    setSalesForm((prev) => {
-      const merged = { ...prev, ...next };
-      const sub = computeSubtotal(merged.cost, merged.qty);
-      return { ...merged, subtotal: sub };
-    });
-  }
-
-  function handleSalesSubmit(e) {
-    e.preventDefault();
-
-    const trans_id = (salesForm.trans_id || "").trim();
-    const guest = (salesForm.guest || "").trim();
-    const item = salesForm.item;
-    const cost = Number(salesForm.cost || 0);
-    const qty = Number(salesForm.qty || 0);
-    const subtotal = cost * qty;
-
-    if (!trans_id || !guest || !item || qty <= 0 || cost < 0) {
-      alert("Please complete the form.");
-      return;
-    }
+  // ✅ Save sale from SalesModal -> localStorage
+  function saveSale(sale) {
+    // sale = { trans_id, guest, item, qty, cost, subtotal, date }
+    const trans_id = sale.trans_id;
 
     const data = JSON.parse(localStorage.getItem(SALES_KEY) || "{}");
     const list = Array.isArray(data[trans_id]) ? data[trans_id] : [];
 
-    list.push({
-      trans_id,
-      guest,
-      item,
-      qty,
-      cost: Number(cost.toFixed(2)),
-      subtotal: Number(subtotal.toFixed(2)),
-      date: new Date().toISOString(),
-    });
+    list.push(sale);
 
     data[trans_id] = list;
     localStorage.setItem(SALES_KEY, JSON.stringify(data));
 
-    // reset but keep trans + guest
-    setSalesForm((prev) => ({
-      ...prev,
-      item: "",
-      cost: "",
-      qty: 1,
-      subtotal: "0.00",
-    }));
-
-    closeSalesModal();
     alert(`Saved sale for ${trans_id}!`);
   }
 
@@ -276,8 +229,6 @@ export default function Transactions() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-
-
         </div>
       </header>
 
@@ -501,11 +452,7 @@ export default function Transactions() {
             </label>
 
             <div className="modal-actions">
-              <button
-                className="btn secondary"
-                type="button"
-                onClick={closeTxModal}
-              >
+              <button className="btn secondary" type="button" onClick={closeTxModal}>
                 Cancel
               </button>
               <button className="btn primary" type="submit">
@@ -516,130 +463,15 @@ export default function Transactions() {
         </div>
       </div>
 
-      {/* PURCHASED / SALES MODAL */}
-      <div
-        className={`sales-overlay ${salesOpen ? "show" : ""}`}
-        aria-hidden={salesOpen ? "false" : "true"}
-        onClick={(e) => {
-          if (e.target.classList.contains("sales-overlay")) closeSalesModal();
-        }}
-      >
-        <div className="sales-card" role="dialog" aria-modal="true">
-          <button
-            className="sales-close"
-            type="button"
-            onClick={closeSalesModal}
-            aria-label="Close"
-          >
-            ✕
-          </button>
-
-          <h2 className="sales-title">Sales</h2>
-
-          <form id="salesForm" className="sales-form" onSubmit={handleSalesSubmit}>
-            <input type="hidden" value={salesForm.trans_id} readOnly />
-
-            <div className="sales-grid">
-              <label className="sfield">
-                <span>Guest Name</span>
-                <input
-                  id="sales_guest"
-                  type="text"
-                  placeholder="Guest name"
-                  value={salesForm.guest}
-                  onChange={(e) => handleSalesChange({ guest: e.target.value })}
-                  required
-                />
-              </label>
-
-              <label className="sfield">
-                <span>Cost</span>
-                <div className="money">
-                  <span>₱</span>
-                  <input
-                    id="sales_cost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={salesForm.cost}
-                    onChange={(e) => handleSalesChange({ cost: e.target.value })}
-                    required
-                  />
-                </div>
-              </label>
-
-              <label className="sfield">
-                <span>Select Item</span>
-                <select
-                  id="sales_item"
-                  value={salesForm.item}
-                  onChange={(e) => {
-                    const item = e.target.value;
-                    // dataset-cost like your HTML options
-                    const cost =
-                      e.target.selectedOptions?.[0]?.dataset?.cost ?? "";
-                    handleSalesChange({ item, cost });
-                  }}
-                  required
-                >
-                  <option value="" disabled>
-                    Select item
-                  </option>
-                  <option value="Nature’s Spring" data-cost="20">
-                    Nature’s Spring
-                  </option>
-                  <option value="Safeguard" data-cost="15">
-                    Safeguard
-                  </option>
-                  <option value="Towel" data-cost="50">
-                    Towel
-                  </option>
-                </select>
-              </label>
-
-              <label className="sfield">
-                <span>Quantity</span>
-                <input
-                  id="sales_qty"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={salesForm.qty}
-                  onChange={(e) => handleSalesChange({ qty: e.target.value })}
-                  required
-                />
-              </label>
-
-              <label className="sfield">
-                <span>Subtotal</span>
-                <div className="money">
-                  <span>₱</span>
-                  <input
-                    id="sales_subtotal"
-                    type="text"
-                    value={salesForm.subtotal}
-                    readOnly
-                  />
-                </div>
-              </label>
-            </div>
-
-            <div className="sales-actions">
-              <button
-                className="sbtn ghost"
-                type="button"
-                onClick={closeSalesModal}
-              >
-                Cancel
-              </button>
-              <button className="sbtn primary" type="submit">
-                Confirm Sale
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+      {/* ✅ SALES MODAL COMPONENT (REACT) */}
+      <SalesModal
+        open={salesOpen}
+        onClose={closeSalesModal}
+        transId={salesTarget.transId}
+        guestName={salesTarget.guest}
+        items={salesItems}
+        onSave={saveSale}
+      />
     </>
   );
 }
