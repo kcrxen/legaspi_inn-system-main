@@ -39,8 +39,7 @@ export default function Dashboard() {
 
   return (
     <>
-      
-
+    
       {/* Summary Cards */}
       <section className="summary-cards">
         <a href="/room" className="card">
